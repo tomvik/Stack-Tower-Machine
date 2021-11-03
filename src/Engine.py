@@ -22,27 +22,36 @@ def ShowImg(windowTitle, img):
     cv2.waitKey()
 
 
-def RemoveBackground(img, threshold):
+def RemoveBackground(img, threshold, debug=False):
     grayImg = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2GRAY)
     (_, blackAndWhiteImg) = cv2.threshold(
         grayImg, threshold, 255, cv2.THRESH_BINARY_INV)
+    if debug:
+        ShowImg("RemoveBackground - GrayImg", grayImg)
+        ShowImg("RemoveBackground - BnW", blackAndWhiteImg)
     return cv2.bitwise_and(grayImg, grayImg, mask=blackAndWhiteImg)
 
 
-def GetScreenshotWithoutBackground(gameWindow, debug=False):
+def GetScreenshotWithoutBackground(gameWindow, debug=False, fromStorage=False):
     global screenshotsTaken
     screenshotsTaken += 1
     originalScreenshot = None
 
     if debug:
-        originalScreenshot = pyautogui.screenshot(
-            'data/runtime_img/{}.png'.format(screenshotsTaken), region=gameWindow)
+        fileName = "data/runtime_img/{}.png".format(screenshotsTaken)
+        if fromStorage:
+            originalScreenshot = cv2.imread(fileName)
+        else:
+            originalScreenshot = pyautogui.screenshot(
+                fileName, region=gameWindow)
     else:
         originalScreenshot = pyautogui.screenshot(region=gameWindow)
 
-    whiteScreenshot = RemoveBackground(originalScreenshot, 220)
+    whiteScreenshot = RemoveBackground(originalScreenshot.copy(), 205)
 
     if debug:
+        ShowImg("with Background {}".format(
+            screenshotsTaken), originalScreenshot)
         ShowImg("without background {}".format(
             screenshotsTaken), whiteScreenshot)
 
@@ -175,10 +184,10 @@ def PlayGame(version: int = 2):
 
     print("Will begin playing the game")
 
-    screenshot = GetScreenshotWithoutBackground(gameWindow, True)
+    screenshot = GetScreenshotWithoutBackground(gameWindow, True, True)
     contours = GetContours(screenshot, True)
 
-    secondScreenshot = GetScreenshotWithoutBackground(gameWindow, True)
+    secondScreenshot = GetScreenshotWithoutBackground(gameWindow, True, True)
     secondContours = GetContours(secondScreenshot, True)
 
     print("first contours", contours)
