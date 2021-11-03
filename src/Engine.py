@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+import imutils
 import pyautogui
 from pyscreeze import Box, Point
 import Common
@@ -22,8 +23,22 @@ def ShowImg(windowTitle, img):
     cv2.waitKey()
 
 
-def RemoveBackground(img, threshold, debug=False):
-    grayImg = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2GRAY)
+def BlurImg(inputImg, debug=False):
+    img = inputImg.copy()
+    if debug:
+        ShowImg("RemoveBackground - Before Blur", img)
+
+    img = cv2.GaussianBlur(img, (5, 5), cv2.BORDER_DEFAULT)
+
+    if debug:
+        ShowImg("RemoveBackground - After Blur", img)
+
+    return img
+
+
+def RemoveBackground(colorImg, threshold, debug=False):
+    colorImg = BlurImg(colorImg, debug)
+    grayImg = cv2.cvtColor(np.array(colorImg), cv2.COLOR_RGB2GRAY)
     (_, blackAndWhiteImg) = cv2.threshold(
         grayImg, threshold, 255, cv2.THRESH_BINARY_INV)
     if debug:
@@ -36,45 +51,83 @@ def GetScreenshotWithoutBackground(gameWindow, debug=False, fromStorage=False):
     global screenshotsTaken
     screenshotsTaken += 1
     originalScreenshot = None
+    fileName = "data/runtime_img/{}.png".format(screenshotsTaken)
 
     if debug:
-        fileName = "data/runtime_img/{}.png".format(screenshotsTaken)
         if fromStorage:
             originalScreenshot = cv2.imread(fileName)
         else:
             originalScreenshot = pyautogui.screenshot(
                 fileName, region=gameWindow)
     else:
-        originalScreenshot = pyautogui.screenshot(region=gameWindow)
+        if fromStorage:
+            originalScreenshot = cv2.imread(fileName)
+        else:
+            originalScreenshot = pyautogui.screenshot(region=gameWindow)
 
-    whiteScreenshot = RemoveBackground(originalScreenshot.copy(), 205)
+    graySs = RemoveBackground(
+        originalScreenshot.copy(), 205, debug)
 
     if debug:
         ShowImg("with Background {}".format(
             screenshotsTaken), originalScreenshot)
-        ShowImg("without background {}".format(
-            screenshotsTaken), whiteScreenshot)
+        ShowImg("without background gray {}".format(
+            screenshotsTaken), graySs)
 
-    return whiteScreenshot.copy()
+    return graySs.copy()
 
 
-def GetContours(screenshot, debug=False):
-    # 1 contour = both merged
-    # 2 contours = base and new one
-    contours, hierarchy = cv2.findContours(
-        screenshot, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+def DrawContoursOnGray(grayImg, contours):
+    result = None
+    if len(contours):
+        colorImg = cv2.cvtColor(grayImg, cv2.COLOR_GRAY2BGR)
+        result = cv2.drawContours(
+            colorImg, contours, -1, (0, 255, 0), 5)
+
+    return result.copy()
+
+
+# Gotten from https://www.pyimagesearch.com/2021/10/06/opencv-contour-approximation/
+def ApproximateContours(grayImg, contours, eps, debug=False):
+
+    approximations = []
+    for contour in contours:
+        perimeter = cv2.arcLength(contour, True)
+        approx = cv2.approxPolyDP(contour, eps * perimeter, True)
+
+        if debug:
+            text = "eps={:.4f}, num_pts={}".format(eps, len(approx))
+            print("[INFO] {}".format(text))
+
+        approximations.append(approx)
 
     if debug:
-        print("Contours found: ", len(contours))
+        output = DrawContoursOnGray(grayImg, approximations)
+        ShowImg("Approximated Contour", output)
 
-        colorScreenshot = cv2.cvtColor(screenshot, cv2.COLOR_GRAY2BGR)
+    return approximations
 
-        if len(contours):
-            result = cv2.drawContours(
-                colorScreenshot, contours, -1, (0, 255, 0), 3)
-            ShowImg("With contours {}".format(screenshotsTaken), result)
 
-    return contours
+def InteractiveApproximateContours(grayImg, contours):
+    for eps in np.linspace(0.001, 0.01, 10):
+        ApproximateContours(grayImg, contours, eps, True)
+
+
+def GetContours(grayImg, debug=False):
+    contours, hierarchy = cv2.findContours(
+        grayImg, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_KCOS)
+
+    contours = ApproximateContours(grayImg, contours, Common.EPSILON, debug)
+
+    # 1 contour = both merged
+    # 2 contours = base and new one
+    result = DrawContoursOnGray(grayImg, contours)
+
+    if debug:
+        print("Contours found: ", len(contours[0]))
+        ShowImg("With contours {}".format(screenshotsTaken), result)
+
+    return contours, result.copy()
 
 
 def ColorSortImg(gameWindow, screenshot):
@@ -184,16 +237,26 @@ def PlayGame(version: int = 2):
 
     print("Will begin playing the game")
 
-    screenshot = GetScreenshotWithoutBackground(gameWindow, True, True)
-    contours = GetContours(screenshot, True)
+    originalImages = list()
+    imagesWithContours = list()
+    contoursOfImages = list()
 
-    secondScreenshot = GetScreenshotWithoutBackground(gameWindow, True, True)
-    secondContours = GetContours(secondScreenshot, True)
+    for _ in range(2):
+        grayImage = GetScreenshotWithoutBackground(
+            gameWindow, False, True)
 
-    print("first contours", contours)
-    print("second contours", secondContours)
+        originalImages.append(grayImage.copy())
 
-    # ColorSortImg(gameWindow, screenshot)
+        contours, screenshot = GetContours(grayImage)
+        imagesWithContours.append(screenshot.copy())
+        contoursOfImages.append(contours)
+
+    for i in range(len(imagesWithContours)):
+        print("Contour", i, contoursOfImages[i])
+        print("Contour points", len(contoursOfImages[i][0][0]))
+        ShowImg("Final img {}".format(i), imagesWithContours[i])
+
+        # InteractiveApproximateContours(originalImages[i], contoursOfImages[i])
 
     return
 
