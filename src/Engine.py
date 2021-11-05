@@ -298,17 +298,43 @@ def PlayGame(version: int = 2):
         deltasTimes = getTimes()
 
     for i in range(sampleSize - 1):
-        print("For image", i)
-        print("Contours", contoursOfImages[i])
-        print("Amount of contours", len(contoursOfImages[i]))
-        print("For image", i + 1)
-        print("Contours", contoursOfImages[i + 1])
-        print("Amount of contours", len(contoursOfImages[i + 1]))
-        print("Delta time:", deltasTimes[i])
+        firstContour = contoursOfImages[i]
+        secondContour = contoursOfImages[i + 1]
+        # print("For image", i)
+        # print("Contours", firstContour)
+        # print("Amount of contours", len(firstContour))
+        # print("For image", i + 1)
+        # print("Contours", secondContour)
+        # print("Amount of contours", len(secondContour))
+        # print("Delta time:", deltasTimes[i])
+        # If there's a distance delta, that's the one.
+        # If there's a shape delta, that may be the one?
         firstImage = imagesWithContours[i].copy()
-        result = cv2.drawContours(
-            firstImage, contoursOfImages[i + 1], -1, (255, 0, 0), 5)
-        ShowImg("img {} with two contours".format(i), result)
+        filteredContours = []
+        if len(firstContour) == len(secondContour):
+            colors = [(255, 0, 0), (0, 0, 255), (255, 255, 255),
+                      (255, 0, 255), (255, 255, 0), (0, 255, 255)]
+            for j in range(len(firstContour)):
+                # distance = cv2.cv.ShapeDistanceExtractor.computeDistance(
+                #     firstContour[j], secondContour[j])
+                simmilarity = cv2.matchShapes(
+                    firstContour[j], secondContour[j], cv2.CONTOURS_MATCH_I1, 0)
+                # print("Distance between contours", j, "is", distance)
+                print("Sim between contours", j, "is", simmilarity)
+                if simmilarity == 0.0:
+                    firstImage = cv2.drawContours(
+                        firstImage, secondContour[j], -1, (0, 255, 0), 5)
+                else:
+                    filteredContours.append(secondContour[j])
+            if len(filteredContours):
+                print(len(filteredContours))
+                firstImage = cv2.drawContours(
+                    firstImage, filteredContours, -1, (0, 0, 255), 5)
+
+        else:
+            firstImage = cv2.drawContours(
+                firstImage, secondContour, -1, (255, 0, 0), 5)
+        ShowImg("img with two contours", firstImage)
 
         # InteractiveApproximateContours(originalImages[i], contoursOfImages[i])
 
