@@ -33,6 +33,17 @@ def writeImagesAndTimes(colorImages, deltasTimes):
         file.close()
 
 
+def getTimes():
+    file = open(deltaFileName, "r")
+
+    line = file.readline()
+    times = list(map(float, line.split(',')))
+
+    file.close()
+
+    return times
+
+
 def ShowImg(windowTitle, img):
     cv2.imshow(windowTitle, img)
     cv2.waitKey()
@@ -283,11 +294,21 @@ def PlayGame(version: int = 2):
 
     if saveData:
         writeImagesAndTimes(colorImages, deltasTimes)
+    if not takeSS:
+        deltasTimes = getTimes()
 
-    for i in range(len(imagesWithContours)):
-        print("Contour", i, contoursOfImages[i])
-        print("Contour points", len(contoursOfImages[i][0][0]))
-        ShowImg("Final img {}".format(i), imagesWithContours[i])
+    for i in range(sampleSize - 1):
+        print("For image", i)
+        print("Contours", contoursOfImages[i])
+        print("Amount of contours", len(contoursOfImages[i]))
+        print("For image", i + 1)
+        print("Contours", contoursOfImages[i + 1])
+        print("Amount of contours", len(contoursOfImages[i + 1]))
+        print("Delta time:", deltasTimes[i])
+        firstImage = imagesWithContours[i].copy()
+        result = cv2.drawContours(
+            firstImage, contoursOfImages[i + 1], -1, (255, 0, 0), 5)
+        ShowImg("img {} with two contours".format(i), result)
 
         # InteractiveApproximateContours(originalImages[i], contoursOfImages[i])
 
