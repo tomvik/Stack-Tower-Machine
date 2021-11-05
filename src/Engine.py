@@ -1,11 +1,18 @@
 import numpy as np
 import cv2
-import imutils
 import pyautogui
 from pyscreeze import Box, Point
+import time
+
 import Common
 
 screenshotsTaken = 0
+sampleSize = 20
+fileName = "data/runtime_img/2{}.png"
+deltaFileName = "data/runtime_img/2.txt"
+saveData = False
+globalDebug = False
+takeSS = False
 
 
 def GetGameWindow() -> Box:
@@ -14,8 +21,16 @@ def GetGameWindow() -> Box:
     line = file.readline()
     rawGameWindow = tuple(map(int, line.split(',')))
     gameWindow: Box = Box(
-        rawGameWindow[0], rawGameWindow[1] + 120, rawGameWindow[2], rawGameWindow[3] - 120)
+        rawGameWindow[0], rawGameWindow[1], rawGameWindow[2], rawGameWindow[3])
     return gameWindow
+
+
+def writeImagesAndTimes(colorImages, deltasTimes):
+    for i in range(len(colorImages)):
+        cv2.imwrite(fileName.format(i), colorImages[i])
+        file = open(deltaFileName, "w")
+        file.write(",".join(map(str, deltasTimes)))
+        file.close()
 
 
 def ShowImg(windowTitle, img):
@@ -49,21 +64,23 @@ def RemoveBackground(colorImg, threshold, debug=False):
 
 def GetScreenshotWithoutBackground(gameWindow, debug=False, fromStorage=False):
     global screenshotsTaken
-    screenshotsTaken += 1
+    global fileName
     originalScreenshot = None
-    fileName = "data/runtime_img/{}.png".format(screenshotsTaken)
+    localFileName = fileName.format(screenshotsTaken)
+    screenshotsTaken += 1
 
     if debug:
         if fromStorage:
-            originalScreenshot = cv2.imread(fileName)
+            originalScreenshot = cv2.imread(localFileName)
         else:
-            originalScreenshot = pyautogui.screenshot(
-                fileName, region=gameWindow)
+            originalScreenshot = np.array(pyautogui.screenshot(
+                localFileName, region=gameWindow))
     else:
         if fromStorage:
-            originalScreenshot = cv2.imread(fileName)
+            originalScreenshot = cv2.imread(localFileName)
         else:
-            originalScreenshot = pyautogui.screenshot(region=gameWindow)
+            originalScreenshot = np.array(
+                pyautogui.screenshot(region=gameWindow))
 
     graySs = RemoveBackground(
         originalScreenshot.copy(), 205, debug)
@@ -74,7 +91,7 @@ def GetScreenshotWithoutBackground(gameWindow, debug=False, fromStorage=False):
         ShowImg("without background gray {}".format(
             screenshotsTaken), graySs)
 
-    return graySs.copy()
+    return graySs.copy(), originalScreenshot.copy()
 
 
 def DrawContoursOnGray(grayImg, contours):
@@ -228,6 +245,11 @@ def CheckIfGameOver(binaryImg, width, height):
 # v2 = [245, 396]
 # v3 Possibly infinite?
 def PlayGame(version: int = 2):
+    global globalDebug
+    global saveData
+    global takeSS
+    global sampleSize
+
     print("Press p to play")
 
     while Common.option != "p":
@@ -237,19 +259,30 @@ def PlayGame(version: int = 2):
 
     print("Will begin playing the game")
 
-    originalImages = list()
+    colorImages = list()
+    deltasTimes = list()
+    grayImages = list()
     imagesWithContours = list()
     contoursOfImages = list()
 
-    for _ in range(2):
-        grayImage = GetScreenshotWithoutBackground(
-            gameWindow, False, True)
+    for _ in range(sampleSize):
+        startTime = time.time()
+        grayImage, colorImage = GetScreenshotWithoutBackground(
+            gameWindow, globalDebug, not takeSS)
 
-        originalImages.append(grayImage.copy())
+        colorImages.append(colorImage.copy())
+        grayImages.append(grayImage.copy())
 
         contours, screenshot = GetContours(grayImage)
         imagesWithContours.append(screenshot.copy())
         contoursOfImages.append(contours)
+
+        endTime = time.time()
+        deltaTime = endTime - startTime
+        deltasTimes.append(deltaTime)
+
+    if saveData:
+        writeImagesAndTimes(colorImages, deltasTimes)
 
     for i in range(len(imagesWithContours)):
         print("Contour", i, contoursOfImages[i])
