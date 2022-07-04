@@ -15,6 +15,10 @@ Python Script that plays Stack Tower https://www.improvememory.org/simple-games/
     venv\Scripts\activate
     ```
 
-3. Download the dependencies from the `requirements.txt` file.
+3. Download the dependencies from the `requirements.txt` file by running:
+
+    ```
+    pip install -r requirements.txt
+    ```
 
 4. Run the `src/StackTowerMachine.py` script and follow the instructions.
