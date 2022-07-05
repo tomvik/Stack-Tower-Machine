@@ -6,35 +6,35 @@ import time
 
 import Common
 
-screenshotsTaken = 0
-sampleSize = 20
-fileName = "data/runtime_img/2{}.png"
-deltaFileName = "data/runtime_img/2.txt"
-saveData = False
-globalDebug = False
-takeSS = False
+screenshots_taken = 0
+sample_size = 2
+file_name = "data/runtime_img/2{}.png"
+delta_file_name = "data/runtime_img/2.txt"
+save_data = True
+global_debug = True
+take_screenshot = True
 
 
 def GetGameWindow() -> Box:
     print("Reading the coordinates")
     file = open(Common.WINDOW_COORDINATES_TXT, "r")
     line = file.readline()
-    rawGameWindow = tuple(map(int, line.split(',')))
-    gameWindow: Box = Box(
-        rawGameWindow[0], rawGameWindow[1], rawGameWindow[2], rawGameWindow[3])
-    return gameWindow
+    raw_game_window = tuple(map(int, line.split(',')))
+    game_window: Box = Box(
+        raw_game_window[0], raw_game_window[1], raw_game_window[2], raw_game_window[3])
+    return game_window
 
 
-def writeImagesAndTimes(colorImages, deltasTimes):
-    for i in range(len(colorImages)):
-        cv2.imwrite(fileName.format(i), colorImages[i])
-        file = open(deltaFileName, "w")
-        file.write(",".join(map(str, deltasTimes)))
+def WriteImagesAndTimes(color_images, deltas_times):
+    for i in range(len(color_images)):
+        cv2.imwrite(file_name.format(i), color_images[i])
+        file = open(delta_file_name, "w")
+        file.write(",".join(map(str, deltas_times)))
         file.close()
 
 
-def getTimes():
-    file = open(deltaFileName, "r")
+def GetTimes():
+    file = open(delta_file_name, "r")
 
     line = file.readline()
     times = list(map(float, line.split(',')))
@@ -44,79 +44,79 @@ def getTimes():
     return times
 
 
-def ShowImg(windowTitle, img):
-    cv2.imshow(windowTitle, img)
+def ShowImg(window_title, img):
+    cv2.imshow(window_title, img)
     cv2.waitKey()
 
 
-def BlurImg(inputImg, debug=False):
-    img = inputImg.copy()
+def BlurImg(input_img, debug=False):
+    img = input_img.copy()
     if debug:
-        ShowImg("RemoveBackground - Before Blur", img)
+        ShowImg("BlurImg - Before Blur", img)
 
     img = cv2.GaussianBlur(img, (5, 5), cv2.BORDER_DEFAULT)
 
     if debug:
-        ShowImg("RemoveBackground - After Blur", img)
+        ShowImg("BlurImg - After Blur", img)
 
     return img
 
 
-def RemoveBackground(colorImg, threshold, debug=False):
-    colorImg = BlurImg(colorImg, debug)
-    grayImg = cv2.cvtColor(np.array(colorImg), cv2.COLOR_RGB2GRAY)
-    (_, blackAndWhiteImg) = cv2.threshold(
-        grayImg, threshold, 255, cv2.THRESH_BINARY_INV)
+def RemoveBackground(color_img, threshold, debug=False):
+    color_img = BlurImg(color_img, debug)
+    gray_img = cv2.cvtColor(np.array(color_img), cv2.COLOR_RGB2GRAY)
+    (_, black_and_white_img) = cv2.threshold(
+        gray_img, threshold, 255, cv2.THRESH_BINARY_INV)
     if debug:
-        ShowImg("RemoveBackground - GrayImg", grayImg)
-        ShowImg("RemoveBackground - BnW", blackAndWhiteImg)
-    return cv2.bitwise_and(grayImg, grayImg, mask=blackAndWhiteImg)
+        ShowImg("RemoveBackground - GrayImg", gray_img)
+        ShowImg("RemoveBackground - BnW", black_and_white_img)
+    return cv2.bitwise_and(gray_img, gray_img, mask=black_and_white_img)
 
 
-def GetScreenshotWithoutBackground(gameWindow, debug=False, fromStorage=False):
-    global screenshotsTaken
-    global fileName
-    originalScreenshot = None
-    localFileName = fileName.format(screenshotsTaken)
-    screenshotsTaken += 1
+def GetScreenshotWithoutBackground(game_window, debug=False, from_storage=False):
+    global screenshots_taken
+    global file_name
+    original_screenshot = None
+    local_file_name = file_name.format(screenshots_taken)
+    screenshots_taken += 1
 
     if debug:
-        if fromStorage:
-            originalScreenshot = cv2.imread(localFileName)
+        if from_storage:
+            original_screenshot = cv2.imread(local_file_name)
         else:
-            originalScreenshot = np.array(pyautogui.screenshot(
-                localFileName, region=gameWindow))
+            original_screenshot = np.array(pyautogui.screenshot(
+                local_file_name, region=game_window))
     else:
-        if fromStorage:
-            originalScreenshot = cv2.imread(localFileName)
+        if from_storage:
+            original_screenshot = cv2.imread(local_file_name)
         else:
-            originalScreenshot = np.array(
-                pyautogui.screenshot(region=gameWindow))
+            original_screenshot = np.array(
+                pyautogui.screenshot(region=game_window))
 
-    graySs = RemoveBackground(
-        originalScreenshot.copy(), 205, debug)
+    gray_screenshot = RemoveBackground(
+        original_screenshot.copy(), 205, debug)
 
     if debug:
-        ShowImg("with Background {}".format(
-            screenshotsTaken), originalScreenshot)
-        ShowImg("without background gray {}".format(
-            screenshotsTaken), graySs)
+        ShowImg("GetScreenshotWithoutBackground - With Background {}".format(
+            screenshots_taken), original_screenshot)
+        ShowImg("GetScreenshotWithoutBackground - Without Background Gray {}".format(
+            screenshots_taken), gray_screenshot)
 
-    return graySs.copy(), originalScreenshot.copy()
+    return gray_screenshot.copy(), original_screenshot.copy()
 
 
-def DrawContoursOnGray(grayImg, contours):
+def DrawContoursOnGray(gray_img, contours):
     result = None
     if len(contours):
-        colorImg = cv2.cvtColor(grayImg, cv2.COLOR_GRAY2BGR)
+        color_img = cv2.cvtColor(gray_img, cv2.COLOR_GRAY2BGR)
         result = cv2.drawContours(
-            colorImg, contours, -1, (0, 255, 0), 5)
+            color_img, contours, -1, (0, 255, 0), 5)
 
     return result.copy()
 
 
 # Gotten from https://www.pyimagesearch.com/2021/10/06/opencv-contour-approximation/
-def ApproximateContours(grayImg, contours, eps, debug=False):
+def ApproximateContours(gray_img, contours, eps, debug=False):
 
     approximations = []
     for contour in contours:
@@ -130,8 +130,8 @@ def ApproximateContours(grayImg, contours, eps, debug=False):
         approximations.append(approx)
 
     if debug:
-        output = DrawContoursOnGray(grayImg, approximations)
-        ShowImg("Approximated Contour", output)
+        output = DrawContoursOnGray(gray_img, approximations)
+        ShowImg("ApproiximateContours - Approximated Contour", output)
 
     return approximations
 
@@ -141,27 +141,27 @@ def InteractiveApproximateContours(grayImg, contours):
         ApproximateContours(grayImg, contours, eps, True)
 
 
-def GetContours(grayImg, debug=False):
+def GetContours(gray_img, debug=False):
     contours, hierarchy = cv2.findContours(
-        grayImg, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_KCOS)
+        gray_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_KCOS)
 
-    contours = ApproximateContours(grayImg, contours, Common.EPSILON, debug)
+    contours = ApproximateContours(gray_img, contours, Common.EPSILON, debug)
 
     # 1 contour = both merged
     # 2 contours = base and new one
-    result = DrawContoursOnGray(grayImg, contours)
+    result = DrawContoursOnGray(gray_img, contours)
 
     if debug:
         print("Contours found: ", len(contours[0]))
-        ShowImg("With contours {}".format(screenshotsTaken), result)
+        ShowImg("With contours {}".format(screenshots_taken), result)
 
     return contours, result.copy()
 
 
-def ColorSortImg(gameWindow, screenshot):
+def ColorSortImg(game_window, screenshot):
     colors = dict()
-    for y in range(gameWindow.height):
-        for x in range(gameWindow.width):
+    for y in range(game_window.height):
+        for x in range(game_window.width):
             new_key = screenshot[y][x]
             if new_key in colors:
                 colors[new_key] += 1
@@ -173,237 +173,107 @@ def ColorSortImg(gameWindow, screenshot):
     print(sorted_colors)
     print("amount of colors:", len(sorted_colors))
 
-    colorSortedImg = np.zeros(screenshot.shape, dtype=screenshot.dtype)
+    color_sorted_img = np.zeros(screenshot.shape, dtype=screenshot.dtype)
 
-    ShowImg("empty_color_sorted", colorSortedImg)
+    ShowImg("empty_color_sorted", color_sorted_img)
 
-    colorIndex = 0
-    currentOfIndex = 0
-    for y in range(gameWindow.height):
-        for x in range(gameWindow.width):
-            colorSortedImg[y][x] = sorted_colors[colorIndex][0]
-            currentOfIndex += 1
+    color_index = 0
+    current_of_index = 0
+    for y in range(game_window.height):
+        for x in range(game_window.width):
+            color_sorted_img[y][x] = sorted_colors[color_index][0]
+            current_of_index += 1
 
-            if currentOfIndex == sorted_colors[colorIndex][1]:
-                colorIndex += 1
-                currentOfIndex = 0
+            if current_of_index == sorted_colors[color_index][1]:
+                color_index += 1
+                current_of_index = 0
 
-    ShowImg("colored_sorted", colorSortedImg)
+    ShowImg("colored_sorted", color_sorted_img)
 
-
-def GetBlackTiles(binaryImg, width, height, lanes):
-    # Draw a line in the center of the lane
-    desiredWidth = width // (lanes * 2)
-
-    blackTiles = []
-    for i in range(4):
-        lineX = (desiredWidth * 2 * i) + desiredWidth
-
-        lineBlackTiles = []
-        consecutiveBlackPixels = 0
-        MinBlackPixelsForTile = 50
-        inBlackTile = False
-        for lineY in reversed(range(height)):
-            if binaryImg[lineY][lineX] == Common.BINARY_WHITE:
-                consecutiveBlackPixels = 0
-                inBlackTile = False
-                binaryImg[lineY][lineX] = Common.BINARY_BLACK
-            else:
-                consecutiveBlackPixels += 1
-                binaryImg[lineY][lineX] = Common.BINARY_WHITE
-
-            if consecutiveBlackPixels > MinBlackPixelsForTile and not inBlackTile:
-                inBlackTile = True
-                lineBlackTiles.append(
-                    Point(lineX, lineY + MinBlackPixelsForTile))
-
-        blackTiles += lineBlackTiles
-
-        # print(blackTiles)
-        # ShowImg("lineimg", blackAndWhiteImg)
-
-    def sortingFunction(point: Point):
-        return point.y
-
-    blackTiles.sort(reverse=True, key=sortingFunction)
-    # print(blackTiles)
-
-    return blackTiles
-
-
-def CheckIfGameOver(binaryImg, width, height):
-    lineY = height // 2
-
-    blackSpots = 0
-    blackPixelsCount = 0
-    for lineX in range(width // 4, (width // 4) * 3):
-        if binaryImg[lineY][lineX] == Common.BINARY_BLACK:
-            blackPixelsCount += 1
-        else:
-            blackPixelsCount = 0
-
-        if blackPixelsCount == 5:
-            blackSpots += 1
-
-    return blackSpots == 7
-    # print(blackSpots)
-    # cv2.line(binaryImg, Point(desiredWidth, height//2),
-    #          Point(desiredWidth * 3, height//2), (0, 255, 0), 3)
-    # ShowImg("CheckIfGameOver", binaryImg)
-
-
-# v1 = [45, 50]
-# v2 = [245, 396]
-# v3 Possibly infinite?
-def PlayGame(version: int = 2):
-    global globalDebug
-    global saveData
-    global takeSS
-    global sampleSize
+def PlayGame():
+    global global_debug
+    global save_data
+    global take_screenshot
+    global sample_size
 
     print("Press p to play")
 
     while Common.key_option != "p":
         pass
 
-    gameWindow = GetGameWindow()
+    game_window = GetGameWindow()
 
     print("Will begin playing the game")
 
-    colorImages = list()
-    deltasTimes = list()
-    grayImages = list()
-    imagesWithContours = list()
-    contoursOfImages = list()
+    color_images = list()
+    deltas_times = list()
+    gray_images = list()
+    images_with_contours = list()
+    contours_of_images = list()
 
-    for _ in range(sampleSize):
-        startTime = time.time()
-        grayImage, colorImage = GetScreenshotWithoutBackground(
-            gameWindow, globalDebug, not takeSS)
+    for _ in range(sample_size):
+        start_time = time.time()
+        gray_image, color_image = GetScreenshotWithoutBackground(
+            game_window, global_debug, not take_screenshot)
 
-        colorImages.append(colorImage.copy())
-        grayImages.append(grayImage.copy())
+        color_images.append(color_image.copy())
+        gray_images.append(gray_image.copy())
 
-        contours, screenshot = GetContours(grayImage)
-        imagesWithContours.append(screenshot.copy())
-        contoursOfImages.append(contours)
+        contours, screenshot = GetContours(gray_image)
+        images_with_contours.append(screenshot.copy())
+        contours_of_images.append(contours)
 
-        endTime = time.time()
-        deltaTime = endTime - startTime
-        deltasTimes.append(deltaTime)
+        end_time = time.time()
+        delta_time = end_time - start_time
+        deltas_times.append(delta_time)
 
-    if saveData:
-        writeImagesAndTimes(colorImages, deltasTimes)
-    if not takeSS:
-        deltasTimes = getTimes()
+    if save_data:
+        WriteImagesAndTimes(color_images, deltas_times)
+    if not take_screenshot:
+        deltas_times = GetTimes()
 
-    for i in range(sampleSize - 1):
-        firstContour = contoursOfImages[i]
-        secondContour = contoursOfImages[i + 1]
+    for i in range(sample_size - 1):
+        first_contour = contours_of_images[i]
+        second_contour = contours_of_images[i + 1]
         # print("For image", i)
-        # print("Contours", firstContour)
-        # print("Amount of contours", len(firstContour))
+        # print("Contours", first_contour)
+        # print("Amount of contours", len(first_contour))
         # print("For image", i + 1)
-        # print("Contours", secondContour)
-        # print("Amount of contours", len(secondContour))
-        # print("Delta time:", deltasTimes[i])
+        # print("Contours", second_contour)
+        # print("Amount of contours", len(second_contour))
+        # print("Delta time:", deltas_times[i])
         # If there's a distance delta, that's the one.
         # If there's a shape delta, that may be the one?
-        firstImage = imagesWithContours[i].copy()
-        filteredContours = []
-        if len(firstContour) == len(secondContour):
+        first_image = images_with_contours[i].copy()
+        filtered_contours = []
+        if len(first_contour) == len(second_contour):
             colors = [(255, 0, 0), (0, 0, 255), (255, 255, 255),
                       (255, 0, 255), (255, 255, 0), (0, 255, 255)]
-            for j in range(len(firstContour)):
+            for j in range(len(first_contour)):
                 # distance = cv2.cv.ShapeDistanceExtractor.computeDistance(
                 #     firstContour[j], secondContour[j])
                 simmilarity = cv2.matchShapes(
-                    firstContour[j], secondContour[j], cv2.CONTOURS_MATCH_I1, 0)
+                    first_contour[j], second_contour[j], cv2.CONTOURS_MATCH_I1, 0)
                 # print("Distance between contours", j, "is", distance)
                 print("Sim between contours", j, "is", simmilarity)
                 if simmilarity == 0.0:
-                    firstImage = cv2.drawContours(
-                        firstImage, secondContour[j], -1, (0, 255, 0), 5)
+                    first_image = cv2.drawContours(
+                        first_image, second_contour[j], -1, (0, 255, 0), 5)
                 else:
-                    filteredContours.append(secondContour[j])
-            if len(filteredContours):
-                print(len(filteredContours))
-                firstImage = cv2.drawContours(
-                    firstImage, filteredContours, -1, (0, 0, 255), 5)
+                    filtered_contours.append(second_contour[j])
+            if len(filtered_contours):
+                print(len(filtered_contours))
+                first_image = cv2.drawContours(
+                    first_image, filtered_contours, -1, (0, 0, 255), 5)
 
         else:
-            firstImage = cv2.drawContours(
-                firstImage, secondContour, -1, (255, 0, 0), 5)
-        ShowImg("img with two contours", firstImage)
+            first_image = cv2.drawContours(
+                first_image, second_contour, -1, (255, 0, 0), 5)
+        ShowImg("img with two contours", first_image)
 
         # InteractiveApproximateContours(originalImages[i], contoursOfImages[i])
 
     return
-
-    count = 0
-    firstClick = True
-    while Common.key_option != 'q':
-        count += 1
-        screenshot = pyautogui.screenshot(region=gameWindow)
-        blackAndWhiteImg = ConvertToBlackAndWhite(screenshot)
-
-        if not CheckIfGameOver(blackAndWhiteImg, gameWindow.width, gameWindow.height):
-            blackTiles = GetBlackTiles(
-                blackAndWhiteImg, gameWindow.width, gameWindow.height, 4)
-            blackTilesPosition = [
-                Point(
-                    tile.x + gameWindow.left,
-                    tile.y + gameWindow.top + 50
-                ) for tile in blackTiles]
-
-            if version == 1:
-                if len(blackTilesPosition):
-                    blackTile = blackTilesPosition[0]
-                    if firstClick:
-                        pyautogui.moveTo(blackTile.x, blackTile.y, duration=0)
-                        pyautogui.mouseDown(
-                            blackTile.x+40, blackTile.y, duration=0.11)
-                        firstClick = False
-                    pyautogui.mouseDown(
-                        blackTile.x+40, blackTile.y, duration=0)
-            elif version == 2:
-                for blackTile in blackTilesPosition:
-                    if firstClick:
-                        pyautogui.moveTo(blackTile.x, blackTile.y, duration=0)
-                        pyautogui.mouseDown(
-                            blackTile.x+40, blackTile.y, duration=0.11)
-                        firstClick = False
-                    pyautogui.mouseDown(
-                        blackTile.x+40, blackTile.y, duration=0)
-            elif version == 3:
-                if len(blackTilesPosition):
-                    blackTile = blackTilesPosition[0]
-                    if firstClick:
-                        pyautogui.moveTo(blackTile.x, blackTile.y, duration=0)
-                        pyautogui.mouseDown(
-                            blackTile.x+40, blackTile.y, duration=0.11)
-                        firstClick = False
-                    pyautogui.mouseDown(
-                        blackTile.x+40, blackTile.y, duration=0)
-                    positions = [
-                        gameWindow.left + gameWindow.width // 8,
-                        gameWindow.left + (gameWindow.width // 8) * 3,
-                        gameWindow.left + (gameWindow.width // 8) * 5,
-                        gameWindow.left + (gameWindow.width // 8) * 7,
-                    ]
-                    while Common.key_option != 'q':
-                        for position in positions:
-                            pyautogui.mouseDown(
-                                position, blackTile.y, duration=0.1)
-            else:
-                version = 2
-
-        else:
-            print("Game over")
-            break
-
-    pyautogui.mouseUp()
-
 
 if __name__ == "__main__":
     Common.key_option = "p"

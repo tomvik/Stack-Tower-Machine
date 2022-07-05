@@ -4,7 +4,7 @@ from pyscreeze import Box
 import Common
 
 # For this to work, there has to be the color white outside the game box.
-def FindGameBoxFromAPoint(screenshot_img, center_x, center_y):
+def FindGameBoxFromAPoint(screenshot_img, center_x, center_y) -> Box:
         # Left
         x_left = center_x
         while screenshot_img.getpixel((x_left, center_y)) != Common.COLOR_WHITE:
@@ -32,7 +32,7 @@ def FindGameBoxFromAPoint(screenshot_img, center_x, center_y):
 
 
 # Finds the Game Box and writes it down to a file.
-def FindGameBox():
+def FindGameBox() -> None:
     print("Enter this link: https://www.improvememory.org/simple-games/stack-tower/ and don't click anything")
     print("Press 's' when ready to take the screenshot")
 

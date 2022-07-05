@@ -5,10 +5,10 @@ from Engine import PlayGame
 def Menu() -> None:
     print("Welcome to the Stack Tower Machine. Please select an option.\n")
 
-    validOption = False
+    valid_option = False
 
-    while not validOption:
-        validOption = True
+    while not valid_option:
+        valid_option = True
 
         print("1. Select screen window.")
         print("2. Play game mode.")
@@ -29,7 +29,7 @@ def Menu() -> None:
             print("Force quit")
             break
         else:
-            validOption = False
+            valid_option = False
             print("Wrong parameter, select a number from the options.\n")
 
 
