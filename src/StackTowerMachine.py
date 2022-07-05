@@ -1,5 +1,5 @@
 import Common
-from ScreenWindowSelection import FindCoordinates
+from ScreenWindowSelection import FindGameBox
 from Engine import PlayGame
 
 def Menu() -> None:
@@ -21,7 +21,7 @@ def Menu() -> None:
 
         if(Common.key_option == '1'):
             print("Select screen window")
-            FindCoordinates()
+            FindGameBox()
         elif(Common.key_option == '2'):
             print("Play game in slow mode")
             PlayGame()
