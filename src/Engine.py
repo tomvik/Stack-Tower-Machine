@@ -263,7 +263,7 @@ def PlayGame(version: int = 2):
 
     print("Press p to play")
 
-    while Common.option != "p":
+    while Common.key_option != "p":
         pass
 
     gameWindow = GetGameWindow()
@@ -342,7 +342,7 @@ def PlayGame(version: int = 2):
 
     count = 0
     firstClick = True
-    while Common.option != 'q':
+    while Common.key_option != 'q':
         count += 1
         screenshot = pyautogui.screenshot(region=gameWindow)
         blackAndWhiteImg = ConvertToBlackAndWhite(screenshot)
@@ -391,7 +391,7 @@ def PlayGame(version: int = 2):
                         gameWindow.left + (gameWindow.width // 8) * 5,
                         gameWindow.left + (gameWindow.width // 8) * 7,
                     ]
-                    while Common.option != 'q':
+                    while Common.key_option != 'q':
                         for position in positions:
                             pyautogui.mouseDown(
                                 position, blackTile.y, duration=0.1)
@@ -406,5 +406,5 @@ def PlayGame(version: int = 2):
 
 
 if __name__ == "__main__":
-    Common.option = "p"
+    Common.key_option = "p"
     PlayGame()
