@@ -20,8 +20,9 @@ def GetGameWindow() -> Box:
     file = open(Common.WINDOW_COORDINATES_TXT, "r")
     line = file.readline()
     raw_game_window = tuple(map(int, line.split(',')))
+    game_height_fix = 85
     game_window: Box = Box(
-        raw_game_window[0], raw_game_window[1], raw_game_window[2], raw_game_window[3])
+        raw_game_window[0], raw_game_window[1] + game_height_fix, raw_game_window[2], raw_game_window[3] - game_height_fix)
     return game_window
 
 
@@ -235,13 +236,13 @@ def PlayGame():
     for i in range(sample_size - 1):
         first_contour = contours_of_images[i]
         second_contour = contours_of_images[i + 1]
-        # print("For image", i)
-        # print("Contours", first_contour)
-        # print("Amount of contours", len(first_contour))
-        # print("For image", i + 1)
-        # print("Contours", second_contour)
-        # print("Amount of contours", len(second_contour))
-        # print("Delta time:", deltas_times[i])
+        print("For image", i)
+        print("Contours", first_contour)
+        print("Amount of contours", len(first_contour))
+        print("For image", i + 1)
+        print("Contours", second_contour)
+        print("Amount of contours", len(second_contour))
+        print("Delta time:", deltas_times[i])
         # If there's a distance delta, that's the one.
         # If there's a shape delta, that may be the one?
         first_image = images_with_contours[i].copy()
