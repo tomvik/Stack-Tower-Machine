@@ -189,6 +189,8 @@ def ApproximateAnglesFromContours(contours, debug=False):
 
         all_angles.append(single_angles.copy())        
 
+    #90, 270, 150, 330, 30, 210 - important angles
+
     return all_angles
 
 
