@@ -1,3 +1,5 @@
+from math import atan2, pi
+from cv2 import sqrt
 import numpy as np
 import cv2
 import pyautogui
@@ -51,26 +53,30 @@ def ShowImg(window_title, img):
 
 
 def BlurImg(input_img, debug=False):
+    global screenshots_taken
+
     img = input_img.copy()
     if debug:
-        ShowImg("BlurImg - Before Blur", img)
+        ShowImg("BlurImg - Before Blur {}".format(screenshots_taken), img)
 
     img = cv2.GaussianBlur(img, (5, 5), cv2.BORDER_DEFAULT)
 
     if debug:
-        ShowImg("BlurImg - After Blur", img)
+        ShowImg("BlurImg - After Blur {}".format(screenshots_taken), img)
 
     return img
 
 
 def RemoveBackground(color_img, threshold, debug=False):
+    global screenshots_taken
+
     color_img = BlurImg(color_img, debug)
     gray_img = cv2.cvtColor(np.array(color_img), cv2.COLOR_RGB2GRAY)
     (_, black_and_white_img) = cv2.threshold(
         gray_img, threshold, 255, cv2.THRESH_BINARY_INV)
     if debug:
-        ShowImg("RemoveBackground - GrayImg", gray_img)
-        ShowImg("RemoveBackground - BnW", black_and_white_img)
+        ShowImg("RemoveBackground - GrayImg {}".format(screenshots_taken), gray_img)
+        ShowImg("RemoveBackground - BnW {}".format(screenshots_taken), black_and_white_img)
     return cv2.bitwise_and(gray_img, gray_img, mask=black_and_white_img)
 
 
@@ -118,6 +124,7 @@ def DrawContoursOnGray(gray_img, contours):
 
 # Gotten from https://www.pyimagesearch.com/2021/10/06/opencv-contour-approximation/
 def ApproximateContours(gray_img, contours, eps, debug=False):
+    global screenshots_taken
 
     approximations = []
     for contour in contours:
@@ -132,7 +139,7 @@ def ApproximateContours(gray_img, contours, eps, debug=False):
 
     if debug:
         output = DrawContoursOnGray(gray_img, approximations)
-        ShowImg("ApproiximateContours - Approximated Contour", output)
+        ShowImg("ApproiximateContours - Approximated Contour {}".format(screenshots_taken), output)
 
     return approximations
 
@@ -142,11 +149,56 @@ def InteractiveApproximateContours(grayImg, contours):
         ApproximateContours(grayImg, contours, eps, True)
 
 
+def ApproximateAnglesFromContours(contours, debug=False):
+    if debug:
+        print("ApproximateAnglesFromContours - contours", contours)
+
+    all_angles = []
+    for index_contour, contour in enumerate(contours):
+        if debug:
+            print("ApproximateAnglesFromContours - contour {}".format(index_contour), contour)
+
+        single_angles = []
+        for index_point in range(len(contour) - 1):
+            first_point = contour[index_point][0]
+            second_point = contour[index_point + 1][0]
+
+            if debug:
+                print("ApproximateAnglesFromContours - {} pair of points".format(index_point), first_point, second_point)
+
+
+            angle = atan2( (second_point[1] - first_point[1]), (second_point[0] - first_point[0]) )
+            angle = angle * 180 / pi
+            if angle < 0:
+                angle = 360 + angle
+
+            if debug:
+                print("ApproximateAnglesFromContours - angle", angle)
+            single_angles.append(angle)            
+
+        
+        angle = atan2( (contour[-1][0][1] - contour[0][0][1]), (contour[-1][0][0] - contour[0][0][0]) )
+        angle = angle * 180 / pi
+        if angle < 0:
+            angle = 360 + angle
+
+        if debug:
+            print("ApproximateAnglesFromContours - angle", angle)
+        single_angles.append(angle)            
+        
+
+        all_angles.append(single_angles.copy())        
+
+    return all_angles
+
+
 def GetContours(gray_img, debug=False):
     contours, hierarchy = cv2.findContours(
         gray_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_KCOS)
 
     contours = ApproximateContours(gray_img, contours, Common.EPSILON, debug)
+
+    angles = ApproximateAnglesFromContours(contours, debug)
 
     # 1 contour = both merged
     # 2 contours = base and new one
@@ -155,41 +207,10 @@ def GetContours(gray_img, debug=False):
     if debug:
         print("Contours found: ", len(contours[0]))
         ShowImg("With contours {}".format(screenshots_taken), result)
+        print("Angles ", angles)
 
     return contours, result.copy()
 
-
-def ColorSortImg(game_window, screenshot):
-    colors = dict()
-    for y in range(game_window.height):
-        for x in range(game_window.width):
-            new_key = screenshot[y][x]
-            if new_key in colors:
-                colors[new_key] += 1
-            else:
-                colors[new_key] = 1
-
-    sorted_colors = list(sorted(colors.items(), key=lambda item: item[1]))
-
-    print(sorted_colors)
-    print("amount of colors:", len(sorted_colors))
-
-    color_sorted_img = np.zeros(screenshot.shape, dtype=screenshot.dtype)
-
-    ShowImg("empty_color_sorted", color_sorted_img)
-
-    color_index = 0
-    current_of_index = 0
-    for y in range(game_window.height):
-        for x in range(game_window.width):
-            color_sorted_img[y][x] = sorted_colors[color_index][0]
-            current_of_index += 1
-
-            if current_of_index == sorted_colors[color_index][1]:
-                color_index += 1
-                current_of_index = 0
-
-    ShowImg("colored_sorted", color_sorted_img)
 
 def PlayGame():
     global global_debug
@@ -220,7 +241,7 @@ def PlayGame():
         color_images.append(color_image.copy())
         gray_images.append(gray_image.copy())
 
-        contours, screenshot = GetContours(gray_image)
+        contours, screenshot = GetContours(gray_image, global_debug)
         images_with_contours.append(screenshot.copy())
         contours_of_images.append(contours)
 
