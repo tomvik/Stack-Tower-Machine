@@ -55,7 +55,20 @@ def FindGameBox() -> None:
 
         game_window = FindGameBoxFromAPoint(screenshot_img, center_width, center_height)
     else:
-        print("Not found in center... make sure the game is in the middle of the screen")
+        print("Not found in center... ")
+        print("Move the mouse to any point within the game and press c to mark it.")
+
+        while Common.key_option != "c":
+            pass
+        
+        game_pixel_x, game_pixel_y = pyautogui.position()
+        print("Found in position", game_pixel_x, game_pixel_y)
+
+        screenshot_img = pyautogui.screenshot()
+        game_window = FindGameBoxFromAPoint(screenshot_img, game_pixel_x, game_pixel_y)
+
+
+
 
     if game_window:
         print("Found the window box. Writing to file.")
