@@ -9,12 +9,12 @@ import time
 import Common
 
 screenshots_taken = 0
-sample_size = 2
+sample_size = 10
 file_name = "data/runtime_img/2{}.png"
 delta_file_name = "data/runtime_img/2.txt"
-save_data = True
-global_debug = True
-take_screenshot = True
+save_data = False
+global_debug = False
+take_screenshot = False
 
 
 def GetGameWindow() -> Box:
@@ -149,6 +149,17 @@ def InteractiveApproximateContours(grayImg, contours):
         ApproximateContours(grayImg, contours, eps, True)
 
 
+def GetAngleBetweenTwoPoints(first_point, second_point):
+    # Multiply by -1 because we're in the fourth quadrant.
+    angle = atan2( (second_point[1] - first_point[1]), (second_point[0] - first_point[0]) ) * -1
+    angle = angle * 180 / pi
+
+    if angle < 0:
+        angle = 360 + angle
+
+    return angle
+
+
 def ApproximateAnglesFromContours(contours, debug=False):
     if debug:
         print("ApproximateAnglesFromContours - contours", contours)
@@ -166,21 +177,14 @@ def ApproximateAnglesFromContours(contours, debug=False):
             if debug:
                 print("ApproximateAnglesFromContours - {} pair of points".format(index_point), first_point, second_point)
 
-
-            angle = atan2( (second_point[1] - first_point[1]), (second_point[0] - first_point[0]) )
-            angle = angle * 180 / pi
-            if angle < 0:
-                angle = 360 + angle
+            angle = GetAngleBetweenTwoPoints(first_point, second_point)
 
             if debug:
                 print("ApproximateAnglesFromContours - angle", angle)
             single_angles.append(angle)            
 
         
-        angle = atan2( (contour[-1][0][1] - contour[0][0][1]), (contour[-1][0][0] - contour[0][0][0]) )
-        angle = angle * 180 / pi
-        if angle < 0:
-            angle = 360 + angle
+        angle = GetAngleBetweenTwoPoints(contour[-1][0], contour[0][0])
 
         if debug:
             print("ApproximateAnglesFromContours - angle", angle)
@@ -211,7 +215,7 @@ def GetContours(gray_img, debug=False):
         ShowImg("With contours {}".format(screenshots_taken), result)
         print("Angles ", angles)
 
-    return contours, result.copy()
+    return contours, angles, result.copy()
 
 
 def PlayGame():
@@ -226,78 +230,100 @@ def PlayGame():
         pass
 
     game_window = GetGameWindow()
+    game_center_point = pyautogui.center(game_window)
 
     print("Will begin playing the game")
+
+    if take_screenshot:
+        pyautogui.click(game_center_point)
+        pyautogui.sleep(1)
+    
+    print("clicked screen")
 
     color_images = list()
     deltas_times = list()
     gray_images = list()
     images_with_contours = list()
     contours_of_images = list()
+    angles_of_images = list()
 
-    for _ in range(sample_size):
-        start_time = time.time()
-        gray_image, color_image = GetScreenshotWithoutBackground(
-            game_window, global_debug, not take_screenshot)
+    while Common.key_option != "q":
 
-        color_images.append(color_image.copy())
-        gray_images.append(gray_image.copy())
+        for _ in range(sample_size):
+            start_time = time.time()
+            gray_image, color_image = GetScreenshotWithoutBackground(
+                game_window, global_debug, not take_screenshot)
 
-        contours, screenshot = GetContours(gray_image, global_debug)
-        images_with_contours.append(screenshot.copy())
-        contours_of_images.append(contours)
+            color_images.append(color_image.copy())
+            gray_images.append(gray_image.copy())
 
-        end_time = time.time()
-        delta_time = end_time - start_time
-        deltas_times.append(delta_time)
+            contours, angles, screenshot = GetContours(gray_image, global_debug)
+            images_with_contours.append(screenshot.copy())
+            contours_of_images.append(contours)
+            angles_of_images.append(angles)
 
-    if save_data:
-        WriteImagesAndTimes(color_images, deltas_times)
-    if not take_screenshot:
-        deltas_times = GetTimes()
+            end_time = time.time()
+            delta_time = end_time - start_time
+            deltas_times.append(delta_time)
 
-    for i in range(sample_size - 1):
-        first_contour = contours_of_images[i]
-        second_contour = contours_of_images[i + 1]
-        print("For image", i)
-        print("Contours", first_contour)
-        print("Amount of contours", len(first_contour))
-        print("For image", i + 1)
-        print("Contours", second_contour)
-        print("Amount of contours", len(second_contour))
-        print("Delta time:", deltas_times[i])
-        # If there's a distance delta, that's the one.
-        # If there's a shape delta, that may be the one?
-        first_image = images_with_contours[i].copy()
-        filtered_contours = []
-        if len(first_contour) == len(second_contour):
-            colors = [(255, 0, 0), (0, 0, 255), (255, 255, 255),
-                      (255, 0, 255), (255, 255, 0), (0, 255, 255)]
-            for j in range(len(first_contour)):
-                # distance = cv2.cv.ShapeDistanceExtractor.computeDistance(
-                #     firstContour[j], secondContour[j])
-                simmilarity = cv2.matchShapes(
-                    first_contour[j], second_contour[j], cv2.CONTOURS_MATCH_I1, 0)
-                # print("Distance between contours", j, "is", distance)
-                print("Sim between contours", j, "is", simmilarity)
-                if simmilarity == 0.0:
+        if save_data:
+            WriteImagesAndTimes(color_images, deltas_times)
+        if not take_screenshot:
+            deltas_times = GetTimes()
+
+        for i in range(sample_size - 1):
+            first_contour = contours_of_images[i]
+            second_contour = contours_of_images[i + 1]
+            first_angles = angles_of_images[i]
+            second_angles = angles_of_images[i + 1]
+            print("For image", i)
+            # print("Contours", first_contour)
+            print("Amount of contours", len(first_contour))
+            print("Angles", first_angles)
+            print("For image", i + 1)
+            # print("Contours", second_contour)
+            print("Amount of contours", len(second_contour))
+            print("Angles", second_angles)
+            print("Delta time:", deltas_times[i])
+            # If there's a distance delta, that's the one.
+            # If there's a shape delta, that may be the one?
+            first_image = images_with_contours[i].copy()
+            filtered_contours = []
+            if len(first_contour) == len(second_contour):
+                colors = [(255, 0, 0), (0, 0, 255), (255, 255, 255),
+                        (255, 0, 255), (255, 255, 0), (0, 255, 255)]
+                for j in range(len(first_contour)):
+                    # distance = cv2.cv.ShapeDistanceExtractor.computeDistance(
+                    #     firstContour[j], secondContour[j])
+                    simmilarity = cv2.matchShapes(
+                        first_contour[j], second_contour[j], cv2.CONTOURS_MATCH_I1, 0)
+                    # print("Distance between contours", j, "is", distance)
+                    print("Sim between contours", j, "is", simmilarity)
+                    if simmilarity == 0.0:
+                        first_image = cv2.drawContours(
+                            first_image, second_contour[j], -1, (0, 255, 0), 5)
+                    else:
+                        filtered_contours.append(second_contour[j])
+                if len(filtered_contours):
+                    print(len(filtered_contours))
                     first_image = cv2.drawContours(
-                        first_image, second_contour[j], -1, (0, 255, 0), 5)
-                else:
-                    filtered_contours.append(second_contour[j])
-            if len(filtered_contours):
-                print(len(filtered_contours))
+                        first_image, filtered_contours, -1, (0, 0, 255), 5)
+
+            else:
                 first_image = cv2.drawContours(
-                    first_image, filtered_contours, -1, (0, 0, 255), 5)
+                    first_image, second_contour, -1, (255, 0, 0), 5)
+            
+            for contours_idx in range(len(first_contour)):
+                for contour_idx in range(len(first_contour[contours_idx])):
+                    contour = first_contour[contours_idx][contour_idx][0]
+                    angle = first_angles[contours_idx][contour_idx]
+                    print(contour, angle)
+                    cv2.putText(first_image, "{:.2f}".format(angle), contour, fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(255, 0, 0))
+            ShowImg("img with two contours", first_image)
 
-        else:
-            first_image = cv2.drawContours(
-                first_image, second_contour, -1, (255, 0, 0), 5)
-        ShowImg("img with two contours", first_image)
+            # InteractiveApproximateContours(originalImages[i], contoursOfImages[i])
 
-        # InteractiveApproximateContours(originalImages[i], contoursOfImages[i])
-
-    return
+        return
 
 if __name__ == "__main__":
     Common.key_option = "p"
