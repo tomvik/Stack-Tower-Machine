@@ -9,9 +9,9 @@ import time
 import Common
 
 screenshots_taken = 0
-sample_size = 10
-file_name = "data/runtime_img/2{}.png"
-delta_file_name = "data/runtime_img/2.txt"
+sample_size = 60
+file_name = "data/runtime_img/4{}.png"
+delta_file_name = "data/runtime_img/4.txt"
 save_data = False
 global_debug = False
 take_screenshot = False
@@ -218,13 +218,38 @@ def GetContours(gray_img, debug=False):
     return contours, angles, result.copy()
 
 def IsAngleStraight(angle: float) -> bool:
-    angle_dif = 8
+    angle_dif = 10
     if angle <= 90 + angle_dif and angle >= 90 - angle_dif:
         return True
     elif angle <= 270 + angle_dif and angle >= 270 - angle_dif:
         return True
     return False
 
+def GetImportantPointsAndAngles(contours_of_images, angles_of_images):
+    global sample_size
+
+    important_points_of_images = list()
+    important_angles_of_images = list()
+
+    for i in range(sample_size):
+        normal_contours = contours_of_images[i]
+        angles = angles_of_images[i]
+        important_points_of_image = list()
+        important_angles_of_image = list()
+
+        for contours_idx in range(len(normal_contours)):
+            for contour_idx in range(len(normal_contours[contours_idx])):
+                contour = normal_contours[contours_idx][contour_idx][0]
+                angle = angles[contours_idx][contour_idx]
+
+                if IsAngleStraight(angle):
+                    important_points_of_image.append(contour)
+                    important_angles_of_image.append(angle)
+
+        important_points_of_images.append(important_points_of_image.copy())
+        important_angles_of_images.append(important_angles_of_image.copy())
+
+    return important_points_of_images.copy(), important_angles_of_images.copy()
 
 def PlayGame():
     global global_debug
@@ -244,7 +269,7 @@ def PlayGame():
 
     if take_screenshot:
         pyautogui.click(game_center_point)
-        pyautogui.sleep(1)
+        pyautogui.sleep(0.35)
     
     print("clicked screen")
 
@@ -254,6 +279,8 @@ def PlayGame():
     images_with_contours = list()
     contours_of_images = list()
     angles_of_images = list()
+    important_points_of_images = list()
+    important_angles_of_images = list()
 
     while Common.key_option != "q":
 
@@ -279,6 +306,24 @@ def PlayGame():
         if not take_screenshot:
             deltas_times = GetTimes()
 
+        important_points_of_images, important_angles_of_images = GetImportantPointsAndAngles(contours_of_images, angles_of_images)
+
+        image = images_with_contours[0].copy()
+        for i in range(sample_size):
+            for point_idx in range(len(important_points_of_images[i])):
+                point = important_points_of_images[i][point_idx]
+                angle = important_angles_of_images[i][point_idx]
+                print("i: {},\tpoint: {},\tangle: {}".format(i, point, angle))
+                # cv2.putText(image, "{}".format(angle), point, cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(255, 255, 255))
+                cv2.circle(image, point, 2, (0, 0, 255), -1)
+            ShowImg("important points {}".format(i), image)
+
+        return
+
+
+
+
+
         for i in range(sample_size - 1):
             first_contour = contours_of_images[i]
             second_contour = contours_of_images[i + 1]
@@ -298,8 +343,6 @@ def PlayGame():
             first_image = images_with_contours[i].copy()
             filtered_contours = []
             if len(first_contour) == len(second_contour):
-                colors = [(255, 0, 0), (0, 0, 255), (255, 255, 255),
-                        (255, 0, 255), (255, 255, 0), (0, 255, 255)]
                 for j in range(len(first_contour)):
                     # distance = cv2.cv.ShapeDistanceExtractor.computeDistance(
                     #     firstContour[j], secondContour[j])
@@ -321,13 +364,21 @@ def PlayGame():
                 first_image = cv2.drawContours(
                     first_image, second_contour, -1, (255, 0, 0), 5)
             
-            for contours_idx in range(len(first_contour)):
-                for contour_idx in range(len(first_contour[contours_idx])):
-                    contour = first_contour[contours_idx][contour_idx][0]
-                    angle = first_angles[contours_idx][contour_idx]
-                    if IsAngleStraight(angle):
-                        print(contour, angle)
-                        cv2.putText(first_image, "{:.2f}".format(angle), contour, fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(255, 0, 0))
+            if (len(first_contour) == len(second_contour)):
+                for contours_idx in range(len(first_contour)):
+                    for contour_idx in range(len(first_contour[contours_idx])):
+                        contour = first_contour[contours_idx][contour_idx][0]
+                        angle = first_angles[contours_idx][contour_idx]
+                        if IsAngleStraight(angle):
+                            print(contour, angle)
+                            cv2.putText(first_image, "{:.2f}".format(angle), contour, fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(255, 0, 0))
+                for contours_idx in range(len(second_contour)):
+                    for contour_idx in range(len(second_contour[contours_idx])):
+                        contour = second_contour[contours_idx][contour_idx][0]
+                        angle = second_angles[contours_idx][contour_idx]
+                        if IsAngleStraight(angle):
+                            print(contour, angle)
+                            cv2.putText(first_image, "{:.2f}".format(angle), contour, fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(0, 0, 255))
             ShowImg("img with two contours", first_image)
 
             # InteractiveApproximateContours(originalImages[i], contoursOfImages[i])
