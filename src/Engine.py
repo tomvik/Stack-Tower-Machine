@@ -217,6 +217,14 @@ def GetContours(gray_img, debug=False):
 
     return contours, angles, result.copy()
 
+def IsAngleStraight(angle: float) -> bool:
+    angle_dif = 8
+    if angle <= 90 + angle_dif and angle >= 90 - angle_dif:
+        return True
+    elif angle <= 270 + angle_dif and angle >= 270 - angle_dif:
+        return True
+    return False
+
 
 def PlayGame():
     global global_debug
@@ -317,8 +325,9 @@ def PlayGame():
                 for contour_idx in range(len(first_contour[contours_idx])):
                     contour = first_contour[contours_idx][contour_idx][0]
                     angle = first_angles[contours_idx][contour_idx]
-                    print(contour, angle)
-                    cv2.putText(first_image, "{:.2f}".format(angle), contour, fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(255, 0, 0))
+                    if IsAngleStraight(angle):
+                        print(contour, angle)
+                        cv2.putText(first_image, "{:.2f}".format(angle), contour, fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(255, 0, 0))
             ShowImg("img with two contours", first_image)
 
             # InteractiveApproximateContours(originalImages[i], contoursOfImages[i])
