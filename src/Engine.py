@@ -9,10 +9,10 @@ import time
 import Common
 
 screenshots_taken = 0
-sample_size = 6
+sample_size = 18
 file_name = "data/runtime_img/6{}.png"
 delta_file_name = "data/runtime_img/6.txt"
-save_data = True
+save_data = False
 global_debug = False
 take_screenshot = True
 
@@ -321,7 +321,7 @@ def GetVelocityFromImages(point_deltas, angles_deltas, times_delta):
             distance = distances[point_idx]
             angle = angles[point_idx]
 
-            individual_velocity.append(distance / time_delta)            
+            individual_velocity.append( (distance * cos(angle * pi / 180) ) / time_delta)            
 
         all_velocities.append(individual_velocity.copy())
 
@@ -390,19 +390,20 @@ def ApproximateTimeToClick(velocities, last_points):
 
     if IsPointLeftTarget(left_most_point):
         # have to reach 407 from right
-        approx_time = (right_most_point[0] - 407) / approx_vel
+        approx_time = (right_most_point[0] - 400) / approx_vel
     elif IsPointRightTarget(right_most_point):
-        approx_time = (194 - left_most_point[0]) / approx_vel
+        approx_time = (195 - left_most_point[0]) / approx_vel
 
     print("approx_time", approx_time)
 
-    return approx_time
+    return abs(approx_time)
                 
 
 
 def PlayGame():
     global global_debug
     global save_data
+    global screenshots_taken
     global take_screenshot
     global sample_size
 
@@ -435,6 +436,7 @@ def PlayGame():
     velocity_of_images = list()
 
     while Common.key_option != "q":
+        screenshots_taken = 0
 
         for idx in range(sample_size):
             start_time = time.time()
@@ -478,7 +480,7 @@ def PlayGame():
         while time_to_click > time.time() - start_time:
             pass
         pyautogui.click(game_center_point)
-        pyautogui.sleep(0.35)
+        pyautogui.sleep(0.5)
 
 
 
