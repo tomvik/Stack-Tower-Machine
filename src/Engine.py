@@ -1,4 +1,4 @@
-from math import atan2, pi
+from math import atan2, dist, pi, cos, sin
 from cv2 import sqrt
 import numpy as np
 import cv2
@@ -154,8 +154,10 @@ def GetAngleBetweenTwoPoints(first_point, second_point):
     angle = atan2( (second_point[1] - first_point[1]), (second_point[0] - first_point[0]) ) * -1
     angle = angle * 180 / pi
 
-    if angle < 0:
+    if angle <= 0:
         angle = 360 + angle
+    if angle == 360:
+        angle = 0
 
     return angle
 
@@ -225,6 +227,29 @@ def IsAngleStraight(angle: float) -> bool:
         return True
     return False
 
+def IsAngleMovewise(angle: float) -> bool:
+    angle_dif = 10
+    if angle <= 30 + angle_dif and angle >= 30 - angle_dif:
+        return True
+    if angle <= 210 + angle_dif and angle >= 210 - angle_dif:
+        return True
+    return False
+
+def GetImportantPointsAndAnglesFromImage(contours, angles):
+    important_points_of_image = list()
+    important_angles_of_image = list()
+
+    for contours_idx in range(len(contours)):
+        for point_idx in range(len(contours[contours_idx])):
+            point = contours[contours_idx][point_idx][0]
+            angle = angles[contours_idx][point_idx]
+
+            if IsAngleStraight(angle):
+                important_points_of_image.append(point)
+                important_angles_of_image.append(angle)
+
+    return important_points_of_image, important_angles_of_image
+
 def GetImportantPointsAndAngles(contours_of_images, angles_of_images):
     global sample_size
 
@@ -232,24 +257,70 @@ def GetImportantPointsAndAngles(contours_of_images, angles_of_images):
     important_angles_of_images = list()
 
     for i in range(sample_size):
-        normal_contours = contours_of_images[i]
+        contours = contours_of_images[i]
         angles = angles_of_images[i]
-        important_points_of_image = list()
-        important_angles_of_image = list()
 
-        for contours_idx in range(len(normal_contours)):
-            for contour_idx in range(len(normal_contours[contours_idx])):
-                contour = normal_contours[contours_idx][contour_idx][0]
-                angle = angles[contours_idx][contour_idx]
-
-                if IsAngleStraight(angle):
-                    important_points_of_image.append(contour)
-                    important_angles_of_image.append(angle)
+        important_points_of_image, important_angles_of_image = GetImportantPointsAndAnglesFromImage(contours, angles)
 
         important_points_of_images.append(important_points_of_image.copy())
         important_angles_of_images.append(important_angles_of_image.copy())
 
     return important_points_of_images.copy(), important_angles_of_images.copy()
+
+
+def GetClosestPointWithAngle(set_of_points, anchor_point):
+    closest_point = list()
+    closest_distance = 1000
+    for point in set_of_points:
+        distance = dist(anchor_point, point)
+        if closest_distance > distance:
+            closest_distance = distance
+            closest_point = point
+
+    angle = GetAngleBetweenTwoPoints(anchor_point, closest_point)
+
+    return closest_point, closest_distance, angle
+
+
+def GetDeltaVectorsFromTwoImages(first_points, first_angles, second_points, second_angles):
+    distances = list()
+    angles = list()
+    for point_idx in range(len(first_points)):
+        first_point = first_points[point_idx]
+        second_point, distance, angle = GetClosestPointWithAngle(second_points, first_point)
+
+        distances.append(distance)
+        angles.append(angle)
+
+    return distances, angles
+
+
+def GetDeltaVectors(points_of_images, angles_of_points):
+    for idx in range(len(points_of_images) - 1):
+        first_points = points_of_images[idx]
+        first_angles = angles_of_points[idx]
+
+        second_points = points_of_images[idx + 1]
+        second_angles = angles_of_points[idx + 1]
+
+        for point_idx in range(len(first_points)):
+            first_point = first_points[point_idx]
+            second_point, distance, angle = GetClosestPointWithAngle(second_points, first_point)
+            print("First point: {}\t, Second point: {}\t, distance: {:.2f}\t, angle: {:.2f}".format(
+                first_point, second_point, distance, angle
+            ))
+        Common.key_option = "o"
+        print("Press p to continue")
+        while Common.key_option != "p":
+            pass
+
+def GetPointFromDistanceAndAngle(point, distance, angle):
+    radians = angle * pi / 180
+
+    x = point[0] + (distance * cos(radians))
+    y = point[1] + (distance * sin(radians) * -1)
+
+    return Point(int(x), int(y))
 
 def PlayGame():
     global global_debug
@@ -281,10 +352,12 @@ def PlayGame():
     angles_of_images = list()
     important_points_of_images = list()
     important_angles_of_images = list()
+    important_points_deltas_of_images = list()
+    important_angles_deltas_of_images = list()
 
     while Common.key_option != "q":
 
-        for _ in range(sample_size):
+        for idx in range(sample_size):
             start_time = time.time()
             gray_image, color_image = GetScreenshotWithoutBackground(
                 game_window, global_debug, not take_screenshot)
@@ -297,6 +370,21 @@ def PlayGame():
             contours_of_images.append(contours)
             angles_of_images.append(angles)
 
+            important_points, important_angles = GetImportantPointsAndAnglesFromImage(contours, angles)
+            important_points_of_images.append(important_points)
+            important_angles_of_images.append(important_angles)
+
+            if idx > 0:
+                delta_distances, delta_angles = GetDeltaVectorsFromTwoImages(
+                    important_points_of_images[idx - 1],
+                    important_angles_of_images[idx - 1],
+                    important_points_of_images[idx],
+                    important_angles_of_images[idx]
+                )
+
+                important_points_deltas_of_images.append(delta_distances)
+                important_angles_deltas_of_images.append(delta_angles)
+
             end_time = time.time()
             delta_time = end_time - start_time
             deltas_times.append(delta_time)
@@ -306,16 +394,20 @@ def PlayGame():
         if not take_screenshot:
             deltas_times = GetTimes()
 
-        important_points_of_images, important_angles_of_images = GetImportantPointsAndAngles(contours_of_images, angles_of_images)
+        # deltas_distances, deltas_angles = GetDeltaVectors(important_points_of_images, important_angles_of_images)
 
         image = images_with_contours[0].copy()
         for i in range(sample_size):
             for point_idx in range(len(important_points_of_images[i])):
                 point = important_points_of_images[i][point_idx]
                 angle = important_angles_of_images[i][point_idx]
-                print("i: {},\tpoint: {},\tangle: {}".format(i, point, angle))
+                delta_distance = important_points_deltas_of_images[i][point_idx]
+                delta_angle = important_angles_deltas_of_images[i][point_idx]
+                dest_point = GetPointFromDistanceAndAngle(point, delta_distance, delta_angle)
+                print("i: {},\tpoint: {},\tangle: {},\tdistance to next: {},\tangle to next: {}".format(i, point, angle, delta_distance, delta_angle))
                 # cv2.putText(image, "{}".format(angle), point, cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(255, 255, 255))
                 cv2.circle(image, point, 2, (0, 0, 255), -1)
+                cv2.line(image, point, dest_point, (255,0,0), 2)
             ShowImg("important points {}".format(i), image)
 
         return
