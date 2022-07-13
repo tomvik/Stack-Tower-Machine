@@ -9,12 +9,12 @@ import time
 import Common
 
 screenshots_taken = 0
-sample_size = 60
-file_name = "data/runtime_img/4{}.png"
-delta_file_name = "data/runtime_img/4.txt"
-save_data = False
+sample_size = 6
+file_name = "data/runtime_img/6{}.png"
+delta_file_name = "data/runtime_img/6.txt"
+save_data = True
 global_debug = False
-take_screenshot = False
+take_screenshot = True
 
 
 def GetGameWindow() -> Box:
@@ -282,37 +282,22 @@ def GetClosestPointWithAngle(set_of_points, anchor_point):
     return closest_point, closest_distance, angle
 
 
-def GetDeltaVectorsFromTwoImages(first_points, first_angles, second_points, second_angles):
+def GetDeltaVectorsFromTwoImages(first_points, second_points):
     distances = list()
     angles = list()
     for point_idx in range(len(first_points)):
         first_point = first_points[point_idx]
         second_point, distance, angle = GetClosestPointWithAngle(second_points, first_point)
 
-        distances.append(distance)
-        angles.append(angle)
+        if distance < 20:
+            distances.append(distance)
+            angles.append(angle)
+        else:
+            distances.append(0)
+            angles.append(0)
 
     return distances, angles
 
-
-def GetDeltaVectors(points_of_images, angles_of_points):
-    for idx in range(len(points_of_images) - 1):
-        first_points = points_of_images[idx]
-        first_angles = angles_of_points[idx]
-
-        second_points = points_of_images[idx + 1]
-        second_angles = angles_of_points[idx + 1]
-
-        for point_idx in range(len(first_points)):
-            first_point = first_points[point_idx]
-            second_point, distance, angle = GetClosestPointWithAngle(second_points, first_point)
-            print("First point: {}\t, Second point: {}\t, distance: {:.2f}\t, angle: {:.2f}".format(
-                first_point, second_point, distance, angle
-            ))
-        Common.key_option = "o"
-        print("Press p to continue")
-        while Common.key_option != "p":
-            pass
 
 def GetPointFromDistanceAndAngle(point, distance, angle):
     radians = angle * pi / 180
@@ -321,6 +306,99 @@ def GetPointFromDistanceAndAngle(point, distance, angle):
     y = point[1] + (distance * sin(radians) * -1)
 
     return Point(int(x), int(y))
+
+
+def GetVelocityFromImages(point_deltas, angles_deltas, times_delta):
+    all_velocities = list()
+
+    for image_idx in range(len(point_deltas)):
+        distances = point_deltas[image_idx]
+        angles = angles_deltas[image_idx]
+        time_delta = times_delta[image_idx]
+
+        individual_velocity = list()
+        for point_idx in range(len(distances)):
+            distance = distances[point_idx]
+            angle = angles[point_idx]
+
+            individual_velocity.append(distance / time_delta)            
+
+        all_velocities.append(individual_velocity.copy())
+
+    return all_velocities
+
+def GetAverageVelocityFromImages(velocities):
+    approx_vel = 0
+    invalid_all_count = 0
+
+    for velocities_img in velocities:
+        invalid_count = 0
+        accum_vel = 0
+
+        for velocity in velocities_img:
+            if velocity == 0:
+                invalid_count += 1
+            accum_vel += velocity
+
+        if invalid_count == len(velocities_img):
+            invalid_all_count += 1
+        else:
+            accum_vel /= len(velocities_img) - invalid_count
+
+        approx_vel += accum_vel
+    
+    approx_vel /= len(velocities) - invalid_all_count
+
+    return approx_vel
+
+def GetLeftAndRightMostPoints(points):
+    left_most_point = points[0]
+    right_most_point = points[-1]
+
+    for point in points:
+        if point[0] < left_most_point[0]:
+            left_most_point = point
+        if point[0] > right_most_point[0]:
+            right_most_point = point
+
+    return left_most_point, right_most_point
+
+# 194 and 407 are the important x goals
+def IsPointLeftTarget(point):
+    dif = 5
+    if point[0] <= 194 + dif and point[0] >= 194 - dif:
+        return True
+    return False
+
+def IsPointRightTarget(point):
+    dif = 5
+    if point[0] <= 407 + dif and point[0] >= 407 - dif:
+        return True
+    return False
+
+def ApproximateTimeToClick(velocities, last_points):
+    approx_time = 0
+    approx_vel = GetAverageVelocityFromImages(velocities)
+
+    print("approx_vel", approx_vel)
+    print("last points", last_points)
+
+    left_most_point, right_most_point = GetLeftAndRightMostPoints(last_points)
+
+    print("left", left_most_point)
+    print("right", right_most_point)
+
+    if IsPointLeftTarget(left_most_point):
+        # have to reach 407 from right
+        approx_time = (right_most_point[0] - 407) / approx_vel
+    elif IsPointRightTarget(right_most_point):
+        approx_time = (194 - left_most_point[0]) / approx_vel
+
+    print("approx_time", approx_time)
+
+    return approx_time
+                
+
 
 def PlayGame():
     global global_debug
@@ -354,6 +432,7 @@ def PlayGame():
     important_angles_of_images = list()
     important_points_deltas_of_images = list()
     important_angles_deltas_of_images = list()
+    velocity_of_images = list()
 
     while Common.key_option != "q":
 
@@ -377,9 +456,7 @@ def PlayGame():
             if idx > 0:
                 delta_distances, delta_angles = GetDeltaVectorsFromTwoImages(
                     important_points_of_images[idx - 1],
-                    important_angles_of_images[idx - 1],
                     important_points_of_images[idx],
-                    important_angles_of_images[idx]
                 )
 
                 important_points_deltas_of_images.append(delta_distances)
@@ -394,88 +471,104 @@ def PlayGame():
         if not take_screenshot:
             deltas_times = GetTimes()
 
-        # deltas_distances, deltas_angles = GetDeltaVectors(important_points_of_images, important_angles_of_images)
+        velocity_of_images = GetVelocityFromImages(important_points_deltas_of_images, important_angles_deltas_of_images, deltas_times)
+        time_to_click = ApproximateTimeToClick(velocity_of_images, important_points_of_images[-1])
 
-        image = images_with_contours[0].copy()
-        for i in range(sample_size):
-            for point_idx in range(len(important_points_of_images[i])):
-                point = important_points_of_images[i][point_idx]
-                angle = important_angles_of_images[i][point_idx]
-                delta_distance = important_points_deltas_of_images[i][point_idx]
-                delta_angle = important_angles_deltas_of_images[i][point_idx]
-                dest_point = GetPointFromDistanceAndAngle(point, delta_distance, delta_angle)
-                print("i: {},\tpoint: {},\tangle: {},\tdistance to next: {},\tangle to next: {}".format(i, point, angle, delta_distance, delta_angle))
-                # cv2.putText(image, "{}".format(angle), point, cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(255, 255, 255))
-                cv2.circle(image, point, 2, (0, 0, 255), -1)
-                cv2.line(image, point, dest_point, (255,0,0), 2)
-            ShowImg("important points {}".format(i), image)
-
-        return
+        start_time = time.time()
+        while time_to_click > time.time() - start_time:
+            pass
+        pyautogui.click(game_center_point)
+        pyautogui.sleep(0.35)
 
 
 
 
+        # image = images_with_contours[0].copy()
+        # for i in range(sample_size):
+        #     for point_idx in range(len(important_points_of_images[i])):
+        #         point = important_points_of_images[i][point_idx]
+        #         angle = important_angles_of_images[i][point_idx]
+        #         try:
+        #             delta_distance = important_points_deltas_of_images[i][point_idx]
+        #             delta_angle = important_angles_deltas_of_images[i][point_idx]
+        #             delta_velocity = velocity_of_images[i][point_idx]
+        #         except:
+        #             delta_distance = 0
+        #             delta_angle = 0
+        #             delta_velocity = 0
+        #         delta_time = deltas_times[i]
+        #         dest_point = GetPointFromDistanceAndAngle(point, delta_distance, delta_angle)
+        #         print("i: {},\tpoint: {},\tangle: {:.2f},\tdistance to next: {:.4f},\tangle to next: {:.2f}\td time: {:.5f},\tvel: {:.2f}".format(i, point, angle, delta_distance, delta_angle, delta_time, delta_velocity))
+        #         # cv2.putText(image, "{}".format(angle), point, cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(255, 255, 255))
+        #         cv2.circle(image, point, 2, (0, 0, 255), -1)
+        #         cv2.line(image, point, dest_point, (255,0,0), 2)
+        #     print("")
+        #     ShowImg("important points {}".format(i), image)
 
-        for i in range(sample_size - 1):
-            first_contour = contours_of_images[i]
-            second_contour = contours_of_images[i + 1]
-            first_angles = angles_of_images[i]
-            second_angles = angles_of_images[i + 1]
-            print("For image", i)
-            # print("Contours", first_contour)
-            print("Amount of contours", len(first_contour))
-            print("Angles", first_angles)
-            print("For image", i + 1)
-            # print("Contours", second_contour)
-            print("Amount of contours", len(second_contour))
-            print("Angles", second_angles)
-            print("Delta time:", deltas_times[i])
-            # If there's a distance delta, that's the one.
-            # If there's a shape delta, that may be the one?
-            first_image = images_with_contours[i].copy()
-            filtered_contours = []
-            if len(first_contour) == len(second_contour):
-                for j in range(len(first_contour)):
-                    # distance = cv2.cv.ShapeDistanceExtractor.computeDistance(
-                    #     firstContour[j], secondContour[j])
-                    simmilarity = cv2.matchShapes(
-                        first_contour[j], second_contour[j], cv2.CONTOURS_MATCH_I1, 0)
-                    # print("Distance between contours", j, "is", distance)
-                    print("Sim between contours", j, "is", simmilarity)
-                    if simmilarity == 0.0:
-                        first_image = cv2.drawContours(
-                            first_image, second_contour[j], -1, (0, 255, 0), 5)
-                    else:
-                        filtered_contours.append(second_contour[j])
-                if len(filtered_contours):
-                    print(len(filtered_contours))
-                    first_image = cv2.drawContours(
-                        first_image, filtered_contours, -1, (0, 0, 255), 5)
 
-            else:
-                first_image = cv2.drawContours(
-                    first_image, second_contour, -1, (255, 0, 0), 5)
+
+
+
+        # for i in range(sample_size - 1):
+        #     first_contour = contours_of_images[i]
+        #     second_contour = contours_of_images[i + 1]
+        #     first_angles = angles_of_images[i]
+        #     second_angles = angles_of_images[i + 1]
+        #     print("For image", i)
+        #     # print("Contours", first_contour)
+        #     print("Amount of contours", len(first_contour))
+        #     print("Angles", first_angles)
+        #     print("For image", i + 1)
+        #     # print("Contours", second_contour)
+        #     print("Amount of contours", len(second_contour))
+        #     print("Angles", second_angles)
+        #     print("Delta time:", deltas_times[i])
+        #     # If there's a distance delta, that's the one.
+        #     # If there's a shape delta, that may be the one?
+        #     first_image = images_with_contours[i].copy()
+        #     filtered_contours = []
+        #     if len(first_contour) == len(second_contour):
+        #         for j in range(len(first_contour)):
+        #             # distance = cv2.cv.ShapeDistanceExtractor.computeDistance(
+        #             #     firstContour[j], secondContour[j])
+        #             simmilarity = cv2.matchShapes(
+        #                 first_contour[j], second_contour[j], cv2.CONTOURS_MATCH_I1, 0)
+        #             # print("Distance between contours", j, "is", distance)
+        #             print("Sim between contours", j, "is", simmilarity)
+        #             if simmilarity == 0.0:
+        #                 first_image = cv2.drawContours(
+        #                     first_image, second_contour[j], -1, (0, 255, 0), 5)
+        #             else:
+        #                 filtered_contours.append(second_contour[j])
+        #         if len(filtered_contours):
+        #             print(len(filtered_contours))
+        #             first_image = cv2.drawContours(
+        #                 first_image, filtered_contours, -1, (0, 0, 255), 5)
+
+        #     else:
+        #         first_image = cv2.drawContours(
+        #             first_image, second_contour, -1, (255, 0, 0), 5)
             
-            if (len(first_contour) == len(second_contour)):
-                for contours_idx in range(len(first_contour)):
-                    for contour_idx in range(len(first_contour[contours_idx])):
-                        contour = first_contour[contours_idx][contour_idx][0]
-                        angle = first_angles[contours_idx][contour_idx]
-                        if IsAngleStraight(angle):
-                            print(contour, angle)
-                            cv2.putText(first_image, "{:.2f}".format(angle), contour, fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(255, 0, 0))
-                for contours_idx in range(len(second_contour)):
-                    for contour_idx in range(len(second_contour[contours_idx])):
-                        contour = second_contour[contours_idx][contour_idx][0]
-                        angle = second_angles[contours_idx][contour_idx]
-                        if IsAngleStraight(angle):
-                            print(contour, angle)
-                            cv2.putText(first_image, "{:.2f}".format(angle), contour, fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(0, 0, 255))
-            ShowImg("img with two contours", first_image)
+        #     if (len(first_contour) == len(second_contour)):
+        #         for contours_idx in range(len(first_contour)):
+        #             for contour_idx in range(len(first_contour[contours_idx])):
+        #                 contour = first_contour[contours_idx][contour_idx][0]
+        #                 angle = first_angles[contours_idx][contour_idx]
+        #                 if IsAngleStraight(angle):
+        #                     print(contour, angle)
+        #                     cv2.putText(first_image, "{:.2f}".format(angle), contour, fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(255, 0, 0))
+        #         for contours_idx in range(len(second_contour)):
+        #             for contour_idx in range(len(second_contour[contours_idx])):
+        #                 contour = second_contour[contours_idx][contour_idx][0]
+        #                 angle = second_angles[contours_idx][contour_idx]
+        #                 if IsAngleStraight(angle):
+        #                     print(contour, angle)
+        #                     cv2.putText(first_image, "{:.2f}".format(angle), contour, fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.5, color=(0, 0, 255))
+        #     ShowImg("img with two contours", first_image)
 
-            # InteractiveApproximateContours(originalImages[i], contoursOfImages[i])
+        #     # InteractiveApproximateContours(originalImages[i], contoursOfImages[i])
 
-        return
+        # return
 
 if __name__ == "__main__":
     Common.key_option = "p"
